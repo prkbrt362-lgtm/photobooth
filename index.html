@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Photobooth">
+<title>Photobooth</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+:root{--accent:#ff3d7f;--bg:#0d0d12;--panel:#1b1b24;--line:#2c2c38;--text:#fff;--muted:#9a9aa8;--ok:#22c55e;--warn:#f59e0b}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+svg{width:1em;height:1em;flex:none}
+.ecran{position:fixed;inset:0;display:none;padding:24px;padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right))}
+.ecran.actif{display:flex}
+.centre{flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:28px}
+h1{font-size:64px;font-weight:800;letter-spacing:-1px}
+h2{font-size:44px;font-weight:800}
+.sous{font-size:26px;color:var(--muted)}
+.gros{display:flex;align-items:center;justify-content:center;gap:16px;font-size:30px;font-weight:700;border-radius:24px;padding:26px 40px;min-height:110px;background:var(--panel);border:3px solid var(--line);transition:transform .1s}
+.gros:active{transform:scale(.96)}
+.gros svg{font-size:46px}
+.plein{background:var(--accent);border-color:var(--accent)}
+.vert{background:var(--ok);border-color:var(--ok)}
+.coinBtn{position:absolute;top:20px;right:max(24px,env(safe-area-inset-right));display:flex;align-items:center;gap:10px;font-size:22px;color:var(--muted);padding:14px 20px;border-radius:16px;background:var(--panel);z-index:5}
+.coinBtn svg{font-size:28px}
+
+/* Accueil */
+#go{width:260px;height:260px;border-radius:50%;background:var(--accent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-size:24px;font-weight:700;animation:pulse 2s infinite}
+#go svg{font-size:90px}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}70%{box-shadow:0 0 0 40px transparent}100%{box-shadow:0 0 0 0 transparent}}
+#alertePapier{position:absolute;bottom:18px;right:24px;font-size:16px;color:var(--warn)}
+#erreurCam{color:var(--warn);font-size:20px;max-width:700px}
+
+/* Caméra */
+#camera{gap:24px;align-items:stretch}
+.vue{flex:1;display:flex;align-items:center;justify-content:center;min-width:0}
+#cadreVideo{position:relative;width:100%;max-height:100%;border-radius:24px;overflow:hidden;background:#000}
+#cadreVideo video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.miroir{transform:scaleX(-1)}
+.vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.45) 100%)}
+#decompte{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:260px;font-weight:900;text-shadow:0 6px 40px rgba(0,0,0,.6);pointer-events:none}
+#decompte.pop{animation:pop .9s ease-out}
+@keyframes pop{0%{transform:scale(1.6);opacity:0}25%{transform:scale(1);opacity:1}100%{opacity:.85}}
+.panneau{width:300px;display:flex;flex-direction:column;gap:18px;justify-content:center}
+#filtres{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.filtre{display:flex;flex-direction:column;gap:6px;align-items:center;font-size:16px;font-weight:600;padding:6px;border-radius:16px;border:3px solid transparent;background:var(--panel)}
+.filtre.on{border-color:var(--accent)}
+.mini{position:relative;width:100%;aspect-ratio:3/2;border-radius:10px;overflow:hidden;background:#000}
+.mini video{width:100%;height:100%;object-fit:cover}
+#declic{height:130px;border-radius:65px;font-size:32px}
+#declic svg{font-size:54px}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:50;transition:opacity .08s}
+#flash.on{opacity:1}
+#flash.clic{animation:clic .35s}
+@keyframes clic{0%{opacity:.7}100%{opacity:0}}
+
+/* Aperçu */
+#apercu{gap:24px;align-items:center}
+#apercuImg{flex:1;min-width:0;max-height:100%;object-fit:contain;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+#apercu .panneau{gap:22px}
+
+/* Choix / copies */
+.rangee{display:flex;gap:24px;justify-content:center;flex-wrap:wrap}
+.carte{flex-direction:column;width:280px;height:250px;font-size:30px}
+.carte svg{font-size:90px}
+.carte .duo{display:flex;gap:10px}
+.nb{width:200px;height:200px;font-size:90px;font-weight:900;flex-direction:column;gap:4px}
+.nb small{font-size:20px;font-weight:600;color:rgba(255,255,255,.8)}
+
+/* E-mail */
+#email-ecran{flex-direction:column;justify-content:flex-start;padding-top:40px;gap:22px;align-items:center}
+.ligneMail{display:flex;gap:16px;width:min(1000px,100%)}
+#email{flex:1;font-size:32px;padding:22px 26px;border-radius:20px;border:3px solid var(--line);background:var(--panel);color:var(--text);outline:none;user-select:text;-webkit-user-select:text}
+#email:focus{border-color:var(--accent)}
+#envoyerMail{min-height:auto;padding:0 34px}
+#envoyerMail:disabled{opacity:.35}
+#domaines{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;width:min(1000px,100%)}
+#domaines button{font-size:22px;padding:14px 20px;border-radius:14px;background:var(--panel);border:2px solid var(--line)}
+.consent{display:flex;gap:18px;align-items:center;font-size:20px;color:var(--muted);width:min(1000px,100%);text-align:left;padding:16px 20px;border-radius:16px;background:var(--panel)}
+.consent input{width:40px;height:40px;accent-color:var(--accent);flex:none}
+
+/* Envoi */
+.spin{width:110px;height:110px;border-radius:50%;border:10px solid var(--line);border-top-color:var(--accent);animation:tour 1s linear infinite}
+@keyframes tour{to{transform:rotate(360deg)}}
+.grosIco{font-size:130px;color:var(--ok)}
+.grosIco.ko{color:var(--warn)}
+
+/* Admin */
+#coinAdmin{position:fixed;top:0;left:0;width:90px;height:90px;z-index:60}
+#pin{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:70;display:none;align-items:center;justify-content:center}
+#pin.on{display:flex}
+.pinBox{background:var(--panel);border-radius:24px;padding:28px;display:flex;flex-direction:column;gap:18px;align-items:center}
+#pinPoints{font-size:40px;letter-spacing:14px;height:50px}
+.clavier{display:grid;grid-template-columns:repeat(3,90px);gap:12px}
+.clavier button{height:80px;border-radius:16px;background:var(--bg);font-size:32px;font-weight:700}
+#admin{flex-direction:column;overflow-y:auto;gap:20px;padding-top:30px;padding-bottom:60px;user-select:text;-webkit-user-select:text}
+#admin h2{font-size:34px}
+.grille{display:grid;grid-template-columns:1fr 1fr;gap:16px 24px}
+.champ{display:flex;flex-direction:column;gap:6px;font-size:16px;color:var(--muted)}
+.champ input[type=text],.champ input[type=number],.champ input[type=url],.champ input[type=password]{font-size:20px;padding:12px 14px;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--text)}
+.champ input[type=color]{height:50px;width:100%;border-radius:12px;border:2px solid var(--line);background:var(--panel)}
+.coche{display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text)}
+.coche input{width:26px;height:26px;accent-color:var(--accent)}
+.bloc{background:var(--panel);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.stats{display:flex;gap:30px;font-size:20px}
+.stats b{font-size:34px;display:block}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+.actions button{font-size:18px;padding:14px 20px;border-radius:14px;background:var(--bg);border:2px solid var(--line)}
+.actions .plein{border-color:var(--accent)}
+#testRes{font-size:16px;color:var(--muted)}
+
+#portrait{position:fixed;inset:0;background:var(--bg);z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-size:28px;text-align:center;padding:40px}
+@media (orientation:portrait){#portrait{display:flex}}
+
+/* Petits écrans (téléphone à l'horizontale), pour les tests */
+@media (max-height:600px){
+  .ecran{padding:12px}
+  .centre{gap:14px}
+  h1{font-size:40px}h2{font-size:28px}.sous{font-size:18px}
+  #go{width:170px;height:170px;font-size:16px}#go svg{font-size:56px}
+  .gros{font-size:20px;min-height:70px;padding:14px 22px}.gros svg{font-size:30px}
+  .carte{width:180px;height:150px;font-size:20px}.carte svg{font-size:54px}
+  .nb{width:120px;height:120px;font-size:54px}
+  .panneau{width:220px;gap:10px}#filtres{gap:6px}.filtre{font-size:12px}
+  #declic{height:80px}#declic svg{font-size:34px}
+  #decompte{font-size:150px}
+  #email-ecran{padding-top:16px;gap:12px}#email{font-size:22px;padding:12px 16px}
+  .coinBtn{top:10px;font-size:16px;padding:8px 12px}
+  #erreurCam{font-size:15px}
+}
+
+/* Impression AirPrint : une page 10×15 par tirage */
+#zoneImpression{display:none}
+@page{size:6in 4in;margin:0}
+@media print{
+  html,body{height:auto;overflow:visible;background:#fff}
+  body>*:not(#zoneImpression){display:none!important}
+  #zoneImpression{display:block}
+  #zoneImpression .page{width:6in;height:4in;overflow:hidden;break-after:page;page-break-after:always}
+  #zoneImpression .page:last-child{break-after:auto;page-break-after:auto}
+  #zoneImpression img{width:100%;height:100%;object-fit:cover;display:block}
+}
+</style>
+</head>
+<body>
+
+<!-- 1. Accueil -->
+<section id="accueil" class="ecran centre actif">
+  <h1 id="titreAccueil">Photobooth</h1>
+  <p class="sous" id="sousAccueil"></p>
+  <button id="go"><span data-ico="camera"></span>Touchez pour commencer</button>
+  <p id="erreurCam" hidden></p>
+  <span id="alertePapier" hidden>⚠︎ papier bientôt vide</span>
+</section>
+
+<!-- 2. Caméra + filtres -->
+<section id="camera" class="ecran">
+  <div class="vue">
+    <div id="cadreVideo">
+      <video id="video" class="miroir" muted playsinline autoplay></video>
+      <div class="vig" id="vigPrincipale" hidden></div>
+      <div id="decompte"></div>
+    </div>
+  </div>
+  <div class="panneau">
+    <div id="filtres"></div>
+    <button id="declic" class="gros plein"><span data-ico="camera"></span>Photo !</button>
+  </div>
+</section>
+
+<!-- 3. Aperçu -->
+<section id="apercu" class="ecran">
+  <img id="apercuImg" alt="">
+  <div class="panneau">
+    <button id="btnValider" class="gros vert"><span data-ico="check"></span>Super !</button>
+    <button id="btnReprendre" class="gros"><span data-ico="redo"></span>Reprendre</button>
+  </div>
+</section>
+
+<!-- 4. Choix -->
+<section id="choix" class="ecran centre">
+  <button class="coinBtn" data-accueil><span data-ico="home"></span>Annuler</button>
+  <h2>Que voulez-vous faire ?</h2>
+  <div class="rangee">
+    <button class="gros carte plein" data-mode="print"><span data-ico="print"></span>Imprimer</button>
+    <button class="gros carte" data-mode="email"><span data-ico="mail"></span>Par e-mail</button>
+    <button class="gros carte" data-mode="both"><span class="duo"><span data-ico="print"></span><span data-ico="mail"></span></span>Les deux</button>
+  </div>
+</section>
+
+<!-- 5. Copies -->
+<section id="copies" class="ecran centre">
+  <button class="coinBtn" data-retour="choix"><span data-ico="back"></span>Retour</button>
+  <h2>Combien de tirages ?</h2>
+  <div class="rangee" id="choixCopies"></div>
+</section>
+
+<!-- 6. E-mail -->
+<section id="email-ecran" class="ecran">
+  <button class="coinBtn" data-retour="choix"><span data-ico="back"></span>Retour</button>
+  <h2>Votre adresse e-mail</h2>
+  <div class="ligneMail">
+    <input id="email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="prenom.nom@…">
+    <button id="envoyerMail" class="gros plein" disabled><span data-ico="mail"></span>Envoyer</button>
+  </div>
+  <div id="domaines"></div>
+  <label class="consent"><input type="checkbox" id="consent">J'accepte que mon adresse serve uniquement à m'envoyer cette photo. Elle est effacée après l'envoi.</label>
+</section>
+
+<!-- 7. Envoi -->
+<section id="envoi" class="ecran centre">
+  <div class="spin"></div>
+  <h2>Un instant…</h2>
+</section>
+
+<!-- 8. Merci -->
+<section id="merci" class="ecran centre">
+  <span class="grosIco" data-ico="check"></span>
+  <h2>Merci !</h2>
+  <p class="sous" id="merciTexte"></p>
+</section>
+
+<!-- 9. Erreur -->
+<section id="erreur" class="ecran centre">
+  <span class="grosIco ko" data-ico="alert"></span>
+  <h2>Oups, ça n'est pas parti</h2>
+  <p class="sous">Prévenez l'organisateur.</p>
+  <div class="rangee">
+    <button class="gros plein" id="btnReessayer"><span data-ico="redo"></span>Réessayer</button>
+    <button class="gros" data-accueil><span data-ico="home"></span>Accueil</button>
+  </div>
+  <p id="erreurDetail" style="color:var(--muted);font-size:14px"></p>
+</section>
+
+<!-- 10. Admin -->
+<section id="admin" class="ecran">
+  <h2>Réglages organisateur</h2>
+  <div class="bloc">
+    <div class="stats">
+      <div><b id="stTirages">0</b>tirages</div>
+      <div><b id="stRestant">0</b>restants (estim.)</div>
+      <div><b id="stMails">0</b>e-mails</div>
+      <div><b id="stSessions">0</b>sessions</div>
+      <div><b id="stFile">0</b>e-mails en attente</div>
+    </div>
+    <div class="actions"><button id="razPapier">Nouveau rouleau (remise à zéro)</button></div>
+  </div>
+  <div class="bloc grille">
+    <label class="champ">Titre de l'événement (bandeau sur la photo)<input type="text" id="cTitre"></label>
+    <label class="champ">Sous-titre / date<input type="text" id="cSous"></label>
+    <label class="champ">Adresse du script d'envoi des e-mails<input type="url" id="cScript" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <label class="champ">Clé secrète du script<input type="password" id="cCle"></label>
+    <label class="champ">Couleur principale<input type="color" id="cAccent"></label>
+    <label class="champ">Décompte (secondes)<input type="number" id="cDecompte" min="1" max="10"></label>
+    <label class="champ">Tirages max par personne<input type="number" id="cCopies" min="1" max="5"></label>
+    <label class="champ">Retour à l'accueil si inactif (s)<input type="number" id="cInactif" min="15" max="300"></label>
+    <label class="champ">Capacité papier (tirages)<input type="number" id="cPapier" min="1"></label>
+    <label class="champ">Alerte papier à (restants)<input type="number" id="cAlerte" min="0"></label>
+    <label class="champ">Code PIN admin<input type="password" id="cPin" inputmode="numeric" maxlength="8"></label>
+    <label class="champ" style="grid-column:1/-1">Domaines e-mail proposés (séparés par des virgules)<input type="text" id="cDomaines"></label>
+  </div>
+  <div class="bloc">
+    <div style="font-size:18px;color:var(--muted)">Filtres proposés</div>
+    <div class="actions" id="cFiltres"></div>
+    <label class="coche"><input type="checkbox" id="cFlash">Flash écran (inutile avec les lampes)</label>
+    <label class="coche"><input type="checkbox" id="cMiroir">Photo finale en miroir (comme l'aperçu)</label>
+  </div>
+  <div class="actions">
+    <button class="plein" id="admSave">Enregistrer et revenir</button>
+    <button id="admEnvoyer">Envoyer les e-mails maintenant</button>
+    <button id="admQuit">Quitter sans enregistrer</button>
+    <button id="admReload">Recharger l'appli</button>
+  </div>
+  <p id="testRes"></p>
+</section>
+
+<div id="coinAdmin"></div>
+<div id="pin"><div class="pinBox">
+  <div style="font-size:20px;color:var(--muted)">Code organisateur</div>
+  <div id="pinPoints"></div>
+  <div class="clavier" id="clavier"></div>
+</div></div>
+<div id="flash"></div>
+<div id="zoneImpression"></div>
+<div id="portrait"><span data-ico="rotate" style="font-size:90px"></span>Tournez l'iPad à l'horizontale</div>
+
+<script>
+// ---------- Icônes ----------
+const ICO={
+camera:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+print:'<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+mail:'<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+check:'<polyline points="20 6 9 17 4 12"/>',
+redo:'<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+back:'<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+alert:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+rotate:'<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 18h6"/>'
+};
+const ico=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICO[n]}</svg>`;
+function poserIcones(root=document){root.querySelectorAll('[data-ico]').forEach(e=>{if(!e.dataset.posee){e.insertAdjacentHTML('afterbegin',ico(e.dataset.ico));e.dataset.posee=1}})}
+poserIcones();
+
+// ---------- Utilitaires ----------
+const $=s=>document.querySelector(s);
+const attendre=ms=>new Promise(r=>setTimeout(r,ms));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+// ---------- Filtres ----------
+// css = aperçu en direct ; p = rendu final au pixel près
+const FILTRES=[
+ {id:'normal',nom:'Normal',css:'none',p:null},
+ {id:'nb',nom:'Noir & blanc',css:'grayscale(1) contrast(1.15)',p:{gris:1,con:1.15}},
+ {id:'studio',nom:'Studio',css:'contrast(1.15) brightness(1.04) saturate(.92)',vig:.45,p:{con:1.15,lum:1.04,sat:.92,vignette:.45}},
+ {id:'annees80',nom:'Années 80',css:'saturate(1.35) contrast(1.1) sepia(.15) hue-rotate(-12deg) brightness(1.05)',p:{sat:1.35,con:1.1,lum:1.05,r:1.06,g:.96,b:1.08,lift:18,grain:14}},
+ {id:'beaute',nom:'Embellissement',css:'brightness(1.07) saturate(1.08) contrast(.94) blur(.6px)',p:{glow:.28,lum:1.06,sat:1.08,con:.94,r:1.03}},
+ {id:'sepia',nom:'Vintage',css:'sepia(.75) contrast(1.05)',p:{sepia:.75,con:1.05}}
+];
+
+// ---------- Configuration ----------
+const DEF={titre:'',sousTitre:'',script:'',cle:'',pin:'0000',accent:'#ff3d7f',filtres:FILTRES.map(f=>f.id),flash:false,miroir:false,decompte:3,maxCopies:3,inactivite:45,papier:400,alerte:30,domaines:['gmail.com','hotmail.fr','orange.fr','icloud.com','yahoo.fr','outlook.fr']};
+let cfg=Object.assign({},DEF,store.get('pb_cfg',{}));
+let stats=Object.assign({tirages:0,emails:0,sessions:0,depuisRouleau:0},store.get('pb_stats',{}));
+let session={};
+let flux=null,enCours=false,dernierJob=null,lastAct=Date.now(),ecranCourant='accueil',timerMerci=null;
+
+function montrer(id){
+  document.querySelectorAll('.ecran').forEach(e=>e.classList.toggle('actif',e.id===id));
+  ecranCourant=id;lastAct=Date.now();
+  if(id!=='email-ecran')document.activeElement&&document.activeElement.blur();
+}
+function appliquerCfg(){
+  document.documentElement.style.setProperty('--accent',cfg.accent);
+  $('#titreAccueil').textContent=cfg.titre||'Photobooth';
+  $('#sousAccueil').textContent=cfg.sousTitre||'';
+  const bande=cfg.titre.trim()?140:0;
+  $('#cadreVideo').style.aspectRatio=`1800 / ${1200-bande}`;
+  $('#video').classList.add('miroir');
+  majAlertePapier();construireFiltres();construireDomaines();
+}
+function restants(){return Math.max(0,cfg.papier-stats.depuisRouleau)}
+function majAlertePapier(){$('#alertePapier').hidden=restants()>cfg.alerte}
+
+// ---------- Caméra ----------
+async function demarrerCamera(){
+  if(flux&&flux.active)return true;
+  try{
+    flux=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1920},height:{ideal:1080}},audio:false});
+    document.querySelectorAll('video').forEach(v=>{v.srcObject=flux;v.play().catch(()=>{})});
+    $('#erreurCam').hidden=true;return true;
+  }catch(e){
+    $('#erreurCam').textContent='Caméra inaccessible ('+e.name+'). La page doit être ouverte en https et la caméra autorisée.';
+    $('#erreurCam').hidden=false;return false;
+  }
+}
+async function eveil(){try{if('wakeLock' in navigator)await navigator.wakeLock.request('screen')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)eveil()});
+
+function construireFiltres(){
+  const box=$('#filtres');box.innerHTML='';
+  const actifs=FILTRES.filter(f=>cfg.filtres.includes(f.id));
+  box.style.display=actifs.length>1?'grid':'none';
+  actifs.forEach(f=>{
+    const b=document.createElement('button');b.className='filtre';b.dataset.id=f.id;
+    b.innerHTML=`<div class="mini"><video class="miroir" muted playsinline autoplay style="filter:${f.css}"></video>${f.vig?'<div class="vig"></div>':''}</div><span>${f.nom}</span>`;
+    b.onclick=()=>choisirFiltre(f.id);box.appendChild(b);
+    if(flux){const v=b.querySelector('video');v.srcObject=flux;v.play().catch(()=>{})}
+  });
+}
+function choisirFiltre(id){
+  const f=FILTRES.find(x=>x.id===id)||FILTRES[0];
+  session.filtre=f.id;
+  $('#video').style.filter=f.css;
+  $('#vigPrincipale').hidden=!f.vig;
+  document.querySelectorAll('.filtre').forEach(b=>b.classList.toggle('on',b.dataset.id===f.id));
+}
+
+// ---------- Prise de vue ----------
+async function declencher(){
+  if(enCours)return;enCours=true;
+  const o=$('#decompte');
+  for(let n=cfg.decompte;n>0;n--){o.textContent=n;o.classList.remove('pop');void o.offsetWidth;o.classList.add('pop');await attendre(1000);lastAct=Date.now()}
+  o.textContent='';
+  const fl=$('#flash');
+  if(cfg.flash){fl.classList.add('on');await attendre(300)}
+  const c=capturer();
+  if(cfg.flash){fl.classList.remove('on')}else{fl.classList.remove('clic');void fl.offsetWidth;fl.classList.add('clic')}
+  session.photo=c.toDataURL('image/jpeg',.92);
+  $('#apercuImg').src=session.photo;
+  $('#btnReprendre').hidden=session.reprise>=1;
+  enCours=false;montrer('apercu');
+}
+function capturer(){
+  const v=$('#video'),W=1800,H=1200,bande=cfg.titre.trim()?140:0,PH=H-bande;
+  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  const vw=v.videoWidth,vh=v.videoHeight,tr=W/PH;let sw,sh,sx,sy;
+  if(vw/vh>tr){sh=vh;sw=vh*tr;sx=(vw-sw)/2;sy=0}else{sw=vw;sh=vw/tr;sx=0;sy=(vh-sh)/2}
+  x.save();if(cfg.miroir){x.translate(W,0);x.scale(-1,1)}
+  x.drawImage(v,sx,sy,sw,sh,0,0,W,PH);x.restore();
+  const f=FILTRES.find(z=>z.id===session.filtre);
+  if(f&&f.p)filtrer(x,W,PH,f.p);
+  if(bande){
+    x.fillStyle='#fff';x.fillRect(0,PH,W,bande);
+    x.fillStyle=cfg.accent;x.fillRect(0,PH,W,6);
+    x.textAlign='center';x.textBaseline='middle';x.fillStyle='#111';
+    const sous=cfg.sousTitre.trim();
+    x.font='800 58px -apple-system,system-ui,sans-serif';
+    x.fillText(cfg.titre,W/2,PH+(sous?58:73));
+    if(sous){x.fillStyle='#666';x.font='500 34px -apple-system,system-ui,sans-serif';x.fillText(sous,W/2,PH+108)}
+  }
+  return c;
+}
+function filtrer(ctx,w,h,P){
+  if(P.glow){ // halo doux : copie très floutée superposée
+    const s=document.createElement('canvas');s.width=Math.round(w/12);s.height=Math.round(h/12);
+    const sc=s.getContext('2d');sc.imageSmoothingEnabled=true;sc.imageSmoothingQuality='high';
+    sc.drawImage(ctx.canvas,0,0,w,h,0,0,s.width,s.height);
+    ctx.save();ctx.globalAlpha=P.glow;ctx.globalCompositeOperation='screen';ctx.imageSmoothingQuality='high';
+    ctx.drawImage(s,0,0,s.width,s.height,0,0,w,h);ctx.restore();
+  }
+  const img=ctx.getImageData(0,0,w,h),d=img.data;
+  const con=P.con||1,lum=P.lum||1,sat=P.sat??1,kr=P.r||1,kg=P.g||1,kb=P.b||1,lift=P.lift||0,grain=P.grain||0,sep=P.sepia||0;
+  for(let i=0;i<d.length;i+=4){
+    let r=d[i],g=d[i+1],b=d[i+2];
+    if(P.gris){const y=.299*r+.587*g+.114*b;r=g=b=y}
+    if(sep){
+      const sr=.393*r+.769*g+.189*b,sg=.349*r+.686*g+.168*b,sb=.272*r+.534*g+.131*b;
+      r=r+(sr-r)*sep;g=g+(sg-g)*sep;b=b+(sb-b)*sep;
+    }
+    if(sat!==1){const y=.299*r+.587*g+.114*b;r=y+(r-y)*sat;g=y+(g-y)*sat;b=y+(b-y)*sat}
+    r=((r-128)*con+128)*lum*kr;g=((g-128)*con+128)*lum*kg;b=((b-128)*con+128)*lum*kb;
+    if(lift){const k=(255-lift)/255;r=lift+r*k;g=lift+g*k;b=lift+b*k}
+    if(grain){const n=(Math.random()-.5)*grain;r+=n;g+=n;b+=n}
+    d[i]=r<0?0:r>255?255:r;d[i+1]=g<0?0:g>255?255:g;d[i+2]=b<0?0:b>255?255:b;
+  }
+  ctx.putImageData(img,0,0);
+  if(P.vignette){
+    const gr=ctx.createRadialGradient(w/2,h/2,Math.min(w,h)*.35,w/2,h/2,Math.hypot(w,h)/2);
+    gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,`rgba(0,0,0,${P.vignette})`);
+    ctx.fillStyle=gr;ctx.fillRect(0,0,w,h);
+  }
+}
+
+// ---------- Parcours invité ----------
+function nouvelleSession(){session={filtre:cfg.filtres.includes('normal')?'normal':cfg.filtres[0],reprise:0,mode:null,copies:1,email:null};choisirFiltre(session.filtre)}
+function retourAccueil(){clearTimeout(timerMerci);session={};$('#apercuImg').removeAttribute('src');majAlertePapier();montrer('accueil')}
+
+$('#go').onclick=async()=>{eveil();if(!(await demarrerCamera()))return;nouvelleSession();montrer('camera')};
+$('#declic').onclick=declencher;
+$('#btnValider').onclick=()=>{preparerImpression();montrer('choix')};
+$('#btnReprendre').onclick=()=>{session.reprise++;montrer('camera')};
+document.querySelectorAll('[data-accueil]').forEach(b=>b.onclick=retourAccueil);
+document.querySelectorAll('[data-retour]').forEach(b=>b.onclick=()=>montrer(b.dataset.retour));
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>choisirMode(b.dataset.mode));
+
+function choisirMode(m){
+  session.mode=m;
+  if(m==='email')return allerEmail();
+  if(cfg.maxCopies<=1){session.copies=1;return m==='both'?allerEmail():envoyer()}
+  const box=$('#choixCopies');box.innerHTML='';
+  for(let n=1;n<=cfg.maxCopies;n++){
+    const b=document.createElement('button');b.className='gros nb'+(n===1?' plein':'');
+    b.innerHTML=`${n}<small>tirage${n>1?'s':''}</small>`;
+    b.onclick=()=>{session.copies=n;session.mode==='both'?allerEmail():envoyer()};
+    box.appendChild(b);
+  }
+  montrer('copies');
+}
+
+// E-mail
+function construireDomaines(){
+  const box=$('#domaines');box.innerHTML='';
+  cfg.domaines.forEach(dm=>{const b=document.createElement('button');b.textContent='@'+dm;
+    b.onclick=()=>{const v=$('#email').value.split('@')[0];$('#email').value=v+'@'+dm;majEmail()};box.appendChild(b)});
+}
+const mailOk=v=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
+function majEmail(){$('#envoyerMail').disabled=!(mailOk($('#email').value)&&$('#consent').checked);lastAct=Date.now()}
+function allerEmail(){$('#email').value='';$('#consent').checked=false;majEmail();montrer('email-ecran');$('#email').focus()}
+$('#email').addEventListener('input',majEmail);
+$('#consent').addEventListener('change',majEmail);
+$('#envoyerMail').onclick=()=>{session.email=$('#email').value.trim().toLowerCase();envoyer()};
+
+// ---------- Impression AirPrint ----------
+// Les pages sont préparées dès la validation de la photo, pour être prêtes quand iOS fait l'aperçu.
+function preparerImpression(){
+  const z=$('#zoneImpression');z.innerHTML='';
+  for(let i=0;i<cfg.maxCopies;i++){const p=document.createElement('div');p.className='page';p.innerHTML=`<img src="${session.photo}" alt="">`;z.appendChild(p)}
+}
+function imprimer(n){
+  document.querySelectorAll('#zoneImpression .page').forEach((p,i)=>p.style.display=i<n?'block':'none');
+  window.print(); // doit rester appelé directement depuis un appui de l'invité
+}
+
+// ---------- File d'e-mails (stockée dans l'iPad) ----------
+let db=null;
+function ouvrirDB(){return new Promise((ok,ko)=>{
+  if(db)return ok(db);
+  const r=indexedDB.open('photobooth',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('mails',{keyPath:'id',autoIncrement:true});
+  r.onsuccess=()=>{db=r.result;ok(db)};r.onerror=()=>ko(r.error);
+})}
+async function fileAjouter(m){const d=await ouvrirDB();return new Promise((ok,ko)=>{const t=d.transaction('mails','readwrite');t.objectStore('mails').add(m);t.oncomplete=ok;t.onerror=()=>ko(t.error)})}
+async function fileTout(){const d=await ouvrirDB();return new Promise((ok,ko)=>{const r=d.transaction('mails').objectStore('mails').getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)})}
+async function fileSuppr(id){const d=await ouvrirDB();return new Promise(ok=>{const t=d.transaction('mails','readwrite');t.objectStore('mails').delete(id);t.oncomplete=ok})}
+async function fileCompte(){try{return (await fileTout()).length}catch(e){return 0}}
+
+let envoiEnCours=false;
+async function viderFile(){
+  if(envoiEnCours||!cfg.script||!navigator.onLine)return 'hors ligne ou script non réglé';
+  envoiEnCours=true;let ok=0,ko=0;
+  try{
+    for(const m of await fileTout()){
+      try{
+        const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),30000);
+        const r=await fetch(cfg.script,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body:JSON.stringify({cle:cfg.cle,email:m.email,image:m.image,evenement:m.evenement,date:m.date}),signal:ctl.signal});
+        clearTimeout(t);
+        const rep=await r.json();
+        if(rep.ok){await fileSuppr(m.id);ok++}else{ko++;break}
+      }catch(e){ko++;break} // pas d'internet : on réessaiera plus tard
+    }
+  }finally{envoiEnCours=false}
+  return `${ok} envoyé(s)${ko?', échec : '+ko:''}`;
+}
+window.addEventListener('online',()=>setTimeout(viderFile,3000));
+setInterval(()=>{if(ecranCourant==='accueil'||ecranCourant==='admin')viderFile()},120000);
+
+// ---------- Fin de session ----------
+async function envoyer(){
+  const copies=session.mode==='email'?0:session.copies;
+  const email=session.mode==='print'?null:session.email;
+  if(copies)imprimer(copies); // en premier, pendant l'appui de l'invité
+  try{
+    if(email)await fileAjouter({email,image:session.photo,evenement:cfg.titre,date:new Date().toISOString()});
+    stats.tirages+=copies;stats.depuisRouleau+=copies;if(email)stats.emails++;stats.sessions++;
+    store.set('pb_stats',stats);
+    const t=[];
+    if(copies)t.push(`Touchez « Imprimer » dans la fenêtre, puis récupérez ${copies>1?'vos photos':'votre photo'} sous l'imprimante.`);
+    if(email)t.push('Vous recevrez votre photo par e-mail dans quelques jours.');
+    $('#merciTexte').innerHTML=t.join('<br>');
+    montrer('merci');timerMerci=setTimeout(retourAccueil,copies?15000:7000);
+  }catch(e){$('#erreurDetail').textContent=e.message;montrer('erreur')}
+}
+$('#btnReessayer').onclick=()=>envoyer();
+$('#merci').onclick=retourAccueil;
+
+// Retour auto si inactif
+document.addEventListener('pointerdown',()=>lastAct=Date.now(),true);
+setInterval(()=>{
+  if(['accueil','envoi','admin','merci'].includes(ecranCourant)||enCours)return;
+  if(Date.now()-lastAct>cfg.inactivite*1000)retourAccueil();
+},1000);
+
+// ---------- Admin ----------
+let appui=null,pinSaisi='';
+$('#coinAdmin').addEventListener('pointerdown',()=>{appui=setTimeout(ouvrirPin,3000)});
+['pointerup','pointerleave','pointercancel'].forEach(ev=>$('#coinAdmin').addEventListener(ev,()=>clearTimeout(appui)));
+(function(){const k=$('#clavier');['1','2','3','4','5','6','7','8','9','✕','0','⌫'].forEach(t=>{const b=document.createElement('button');b.textContent=t;
+  b.onclick=()=>{if(t==='✕'){fermerPin();return}if(t==='⌫')pinSaisi=pinSaisi.slice(0,-1);else pinSaisi+=t;
+    $('#pinPoints').textContent='•'.repeat(pinSaisi.length);
+    if(pinSaisi.length>=cfg.pin.length){if(pinSaisi===cfg.pin){fermerPin();ouvrirAdmin()}else{pinSaisi='';setTimeout(()=>$('#pinPoints').textContent='',300)}}};k.appendChild(b)})})();
+function ouvrirPin(){if(ecranCourant==='admin')return;pinSaisi='';$('#pinPoints').textContent='';$('#pin').classList.add('on')}
+function fermerPin(){$('#pin').classList.remove('on')}
+function ouvrirAdmin(){
+  $('#cTitre').value=cfg.titre;$('#cSous').value=cfg.sousTitre;$('#cScript').value=cfg.script;$('#cCle').value=cfg.cle;$('#cAccent').value=cfg.accent;
+  $('#cDecompte').value=cfg.decompte;$('#cCopies').value=cfg.maxCopies;$('#cInactif').value=cfg.inactivite;
+  $('#cPapier').value=cfg.papier;$('#cAlerte').value=cfg.alerte;$('#cPin').value=cfg.pin;$('#cDomaines').value=cfg.domaines.join(', ');
+  $('#cFlash').checked=cfg.flash;$('#cMiroir').checked=cfg.miroir;
+  $('#cFiltres').innerHTML=FILTRES.map(f=>`<label class="coche"><input type="checkbox" value="${f.id}" ${cfg.filtres.includes(f.id)?'checked':''}>${f.nom}</label>`).join('');
+  majStats();$('#testRes').textContent='';montrer('admin');
+}
+function majStats(){$('#stTirages').textContent=stats.tirages;$('#stRestant').textContent=restants();$('#stMails').textContent=stats.emails;$('#stSessions').textContent=stats.sessions;fileCompte().then(n=>$('#stFile').textContent=n)}
+const num=(id,d,min,max)=>{const v=parseInt($(id).value,10);return isNaN(v)?d:Math.min(max,Math.max(min,v))};
+$('#admSave').onclick=()=>{
+  const filtres=[...document.querySelectorAll('#cFiltres input:checked')].map(i=>i.value);
+  const pin=$('#cPin').value.replace(/\D/g,'');
+  cfg={...cfg,titre:$('#cTitre').value.trim(),sousTitre:$('#cSous').value.trim(),script:$('#cScript').value.trim(),cle:$('#cCle').value,accent:$('#cAccent').value,
+    decompte:num('#cDecompte',3,1,10),maxCopies:num('#cCopies',3,1,5),inactivite:num('#cInactif',45,15,300),
+    papier:num('#cPapier',400,1,5000),alerte:num('#cAlerte',30,0,5000),pin:pin.length>=4?pin:cfg.pin,
+    domaines:$('#cDomaines').value.split(',').map(s=>s.trim().replace(/^@/,'')).filter(Boolean),
+    flash:$('#cFlash').checked,miroir:$('#cMiroir').checked,filtres:filtres.length?filtres:['normal']};
+  store.set('pb_cfg',cfg);appliquerCfg();retourAccueil();
+};
+$('#admQuit').onclick=retourAccueil;
+$('#admReload').onclick=()=>location.reload();
+$('#razPapier').onclick=()=>{stats.depuisRouleau=0;store.set('pb_stats',stats);majStats()};
+$('#admEnvoyer').onclick=async()=>{
+  const out=$('#testRes');
+  if(!cfg.script){out.textContent='Renseigne et enregistre d\'abord l\'adresse du script.';return}
+  out.textContent='Envoi en cours…';
+  out.textContent=await viderFile();majStats();
+};
+
+// Mode hors ligne : la page se met en cache au premier chargement
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+appliquerCfg();
+viderFile();
+</script>
+</body>
+</html>
