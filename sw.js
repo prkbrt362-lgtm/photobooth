@@ -1,6 +1,6 @@
 // Cache de l'appli pour un fonctionnement 100 % hors ligne.
 // Après une modification de la page, change le numéro de version pour forcer la mise à jour.
-const VERSION = 'photobooth-v1';
+const VERSION = 'photobooth-v2';
 const FICHIERS = ['./', 'index.html', 'manifest.webmanifest', 'icon.png'];
 
 self.addEventListener('install', e => {

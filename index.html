@@ -492,9 +492,23 @@ function preparerImpression(){
   const z=$('#zoneImpression');z.innerHTML='';
   for(let i=0;i<cfg.maxCopies;i++){const p=document.createElement('div');p.className='page';p.innerHTML=`<img src="${session.photo}" alt="">`;z.appendChild(p)}
 }
+// Sur iPad, une appli lancée depuis l'écran d'accueil ignore window.print() :
+// on passe alors par le menu Partager d'iOS (option « Imprimer »).
+const modeAppli=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches;
+function photoEnFichier(n){
+  const [tete,b64]=session.photo.split(','),bin=atob(b64),u=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+  return new File([u],`photo-${n}.jpg`,{type:'image/jpeg'});
+}
 function imprimer(n){
+  // doit rester appelé directement depuis un appui de l'invité
+  if(modeAppli()&&navigator.canShare){
+    const fichiers=Array.from({length:n},(_,i)=>photoEnFichier(i+1));
+    if(navigator.canShare({files:fichiers})){navigator.share({files:fichiers}).catch(()=>{});return 'partage'}
+  }
   document.querySelectorAll('#zoneImpression .page').forEach((p,i)=>p.style.display=i<n?'block':'none');
-  window.print(); // doit rester appelé directement depuis un appui de l'invité
+  window.print();
+  return 'print';
 }
 
 // ---------- File d'e-mails (stockée dans l'iPad) ----------
@@ -535,13 +549,15 @@ setInterval(()=>{if(ecranCourant==='accueil'||ecranCourant==='admin')viderFile()
 async function envoyer(){
   const copies=session.mode==='email'?0:session.copies;
   const email=session.mode==='print'?null:session.email;
-  if(copies)imprimer(copies); // en premier, pendant l'appui de l'invité
+  const methode=copies?imprimer(copies):null; // en premier, pendant l'appui de l'invité
   try{
     if(email)await fileAjouter({email,image:session.photo,evenement:cfg.titre,date:new Date().toISOString()});
     stats.tirages+=copies;stats.depuisRouleau+=copies;if(email)stats.emails++;stats.sessions++;
     store.set('pb_stats',stats);
     const t=[];
-    if(copies)t.push(`Touchez « Imprimer » dans la fenêtre, puis récupérez ${copies>1?'vos photos':'votre photo'} sous l'imprimante.`);
+    if(copies)t.push(methode==='partage'
+      ?`Touchez « Imprimer » dans le menu, puis encore « Imprimer » en haut à droite.<br>Récupérez ${copies>1?'vos photos':'votre photo'} sous l'imprimante.`
+      :`Touchez « Imprimer » dans la fenêtre, puis récupérez ${copies>1?'vos photos':'votre photo'} sous l'imprimante.`);
     if(email)t.push('Vous recevrez votre photo par e-mail dans quelques jours.');
     $('#merciTexte').innerHTML=t.join('<br>');
     montrer('merci');timerMerci=setTimeout(retourAccueil,copies?15000:7000);
