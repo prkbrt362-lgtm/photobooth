@@ -492,9 +492,8 @@ function preparerImpression(){
   const z=$('#zoneImpression');z.innerHTML='';
   for(let i=0;i<cfg.maxCopies;i++){const p=document.createElement('div');p.className='page';p.innerHTML=`<img src="${session.photo}" alt="">`;z.appendChild(p)}
 }
-// Sur iPad, une appli lancée depuis l'écran d'accueil ignore window.print() :
-// on passe alors par le menu Partager d'iOS (option « Imprimer »).
-const modeAppli=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches;
+// Impression via le menu Partager d'iOS (option « Imprimer ») : fonctionne dans l'appli
+// installée sur l'écran d'accueil (où window.print() est ignoré) et imprime la photo pleine page.
 function photoEnFichier(n){
   const [tete,b64]=session.photo.split(','),bin=atob(b64),u=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
@@ -502,7 +501,8 @@ function photoEnFichier(n){
 }
 function imprimer(n){
   // doit rester appelé directement depuis un appui de l'invité
-  if(modeAppli()&&navigator.canShare){
+  // On envoie la photo elle-même (et pas la page web) : iOS l'ajuste au papier 10×15.
+  if(navigator.canShare){
     const fichiers=Array.from({length:n},(_,i)=>photoEnFichier(i+1));
     if(navigator.canShare({files:fichiers})){navigator.share({files:fichiers}).catch(()=>{});return 'partage'}
   }
